@@ -28,3 +28,4 @@ Cargo.lock
 test*
 **/*.fq.gz
 example
+benchmark2

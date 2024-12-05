@@ -22,18 +22,21 @@ pub struct Args {
     pub outfile: String,
     /// Nunber of max reads to process
     #[arg(short, long)]
-    pub max_reads: Option<usize>,
+    pub limit: Option<usize>,
     /// Number of threads
-    #[arg(short, long, default_value = "1")]
+    #[arg(short, long, default_value = "10")]
     pub threads: usize,
     /// filter read by min_length
     #[arg(short, long, default_value = "100")]
     pub min_length: usize,
+    /// chunk_window
+    #[arg(short= 'w', long, default_value = "100")]
+    pub chunk_window: usize,
     /// chunk_size
     #[arg(short, long, default_value = "100")]
     pub chunk_size: usize,
     /// correct_ratio
-    #[arg(short, long, default_value = "0.2")]
+    #[arg(short = 'r', long, default_value = "0.2")]
     pub correct_ratio: f64,
     /// correct_fix_ratio
     #[arg(short = 'f', long, default_value = "0.2")]
