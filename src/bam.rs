@@ -114,10 +114,12 @@ impl ReadPart {
 
 pub fn get_readparts_idx(record: &Record, chunk_window: i64) -> Vec<ReadParts_idx> {
     let infos = record.aligned_pairs();
+    let softclip_len = record.cigar().leading_softclips();
     let mut chunk_start = 0;
     let mut windows_num = record.pos() / chunk_window;
-    let mut reader_order = 0;
+    let mut reader_order = softclip_len as usize;
     let mut readparts_idxs = Vec::new();
+    // debug!("leading_softclips:{:?}  record.pos: {:?} reference_start:{:?}",record.cigar().leading_softclips(),record.pos(),record.reference_start());
     for info in infos {
         
         let read_pos = info[0];
@@ -228,9 +230,9 @@ pub fn spawn_bam_reader(
                 let sa_tag_count = parse_satag_to_count(&record);
                 // TODO sofclip不支持校正，需要修改
                 // 如果比对上多个地方，直接跳过，进行下一个record的校正
-                if sa_tag_count > 1 {
-                    continue;
-                }
+                // if sa_tag_count > 1 {
+                //     continue;
+                // }
                 // 计算record的分窗信息
                 let readparts_idxs = get_readparts_idx(&record,100);
                 // 解析record的信息

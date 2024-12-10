@@ -151,7 +151,7 @@ cp target/release/Jolish .
 cargo build --release
 cp target/release/Jolish .
 
-file=/home/jiangchen/project/Jolish/example/softclip.fa.bam
+file=/home/jiangchen/project/Jolish/test_3methods_run/alpha_THAL226-34_hg38_hap1.fq.gz.bam
 
 
 ./Jolish -i $file -t 20  -w 100 -o $file.correct.fq.gz

@@ -132,6 +132,7 @@ pub fn writer_receiver_bam(
     // 创建一个BufWriter，用于写入文件
     let mut writer = BufWriter::with_capacity(1_000_000, encoder);
     let mut readpart_count = 0;
+    let mut record_count = 0;
     for readchunk in rrx {
         for readpart in readchunk {
             readpart_count += 1;
@@ -171,15 +172,17 @@ pub fn writer_receiver_bam(
                     write!(writer, "{}", record_str).expect("Failed to write to writer");
                     // Optionally clear the entry if no longer needed
                     writer_fastq_dict.remove(&read_id);
+                    record_count += 1;
                 }
             }
         }
     }
     let elapsed_time = start_time.elapsed();
     info!(
-        "{} readpart writer to fastq {}.\n Time elapsed: {:.4?}",
-        readpart_count, outfile, elapsed_time
-    )
+        "{} record {} readpart writer to fastq {}.",
+        record_count, readpart_count, outfile
+    );
+    info!("Time elapsed: {:.4?}", elapsed_time);
 }
 
 

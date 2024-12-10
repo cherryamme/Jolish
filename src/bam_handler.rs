@@ -77,8 +77,8 @@ impl BamHandler {
 			) {
 				Ok((indices, qual)) => (indices, qual),
 				Err(e) => {
-					let g: Graph<char, i32, Directed, usize> = self.graph.map(|_, n| (*n) as char, |_, e| *e);
-					debug!("Dot graph:\n{:?}", Dot::new(&g));
+					// let g: Graph<char, i32, Directed, usize> = self.graph.map(|_, n| (*n) as char, |_, e| *e);
+					// debug!("Dot graph:\n{:?}", Dot::new(&g));
 					// debug!(
 					// 	"Graph: {:?}",
 					// 	self.graph.map(|_, n| (*n) as char, |_, e| *e)

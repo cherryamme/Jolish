@@ -13,17 +13,15 @@ pub mod bam;
 
 
 fn main() {
-    std::env::set_var("RUST_BACKTRACE", "1");
-    std::env::set_var("RUST_MIN_STACK", "8388608000");
-    std::env::set_var("RUST_LOG", "debug");
+    std::env::set_var("RUST_LOG", "info");
     pretty_env_logger::init();
     let comands: Vec<String> = std::env::args().collect();
     let mut args = args::Args::parse();
     info!("Run Command: {:?}", comands);
-    info!("Args: {:?}", args);
+    // info!("Args: {:?}", args);
     // // 判断inputs是bam还是fastq，使用不同的handler
     // args.inputs.push("/home/jiangchen/project/Jolish/test_hts/559.1000reads.fq.bam".to_string());
-    args.inputs.push("/home/jiangchen/project/Jolish/example/softclip.fa.bam".to_string());
+    // args.inputs.push("/home/jiangchen/project/Jolish/example/softclip.fa.bam".to_string());
     // args.outfile = "/home/jiangchen/project/Jolish/test_hts/559.1000reads.fq.bam.fq.gz".to_string();
     if args.inputs[0].ends_with(".bam") {
         let (rrx, readparts_num_dict) = bam::spawn_bam_reader(args.inputs, args.chunk_size, args.chunk_window, args.max_reads, args.region);
@@ -35,8 +33,7 @@ fn main() {
         //     }
         // }
         std::thread::sleep(std::time::Duration::from_secs(1));
-        debug!("{:?}",readparts_num_dict);
-        info!("start writing to fq.gz");
+        // debug!("{:?}",readparts_num_dict);
         writer::writer_receiver_bam(srx, &readparts_num_dict, &args.outfile);
         return;
     }else if args.inputs[0].ends_with(".fq") || args.inputs[0].ends_with(".fastq") || args.inputs[0].ends_with(".gz") {
