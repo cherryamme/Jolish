@@ -11,7 +11,7 @@ fn styles() -> Styles {
 #[derive(Parser, Debug, Clone)]
 #[command(version, author, about, long_about = None, styles = styles())]
 #[command(
-    help_template = "{usage-heading} {usage} \nVersion: {version} {about-section}Author:{author} Email:jiancghen2@genomics.cn\n {all-args} {tab}"
+    help_template = "{usage-heading} {usage} \nVersion: {version} {about-section}Author:{author} Email:jiancghen2@genomics.cn/cherryamme@qq.com\n {all-args} {tab}"
 )]
 pub struct Args {
     /// The path of input file

@@ -64,8 +64,18 @@ impl ReadPart {
         readparts_idx: &ReadParts_idx,
     ) -> ReadPart {
         let correct = readparts_idx.end - readparts_idx.start >= 70;
-        let seq = read_seq[readparts_idx.start..readparts_idx.end].to_vec();
-        let qual = read_qual[readparts_idx.start..readparts_idx.end].to_vec();
+        let mut seq = read_seq[readparts_idx.start..readparts_idx.end].to_vec();
+        let mut qual = read_qual[readparts_idx.start..readparts_idx.end].to_vec();
+        // Add "ATGCATGC" to the beginning and end of the sequence
+        let prefix_suffix = b"ATGCATGC".to_vec();
+        seq.splice(0..0, prefix_suffix.clone());
+        seq.extend(prefix_suffix.clone());
+
+        // Add Q30 quality values to the beginning and end of the quality vector
+        let q30 = vec![30; 8];
+        qual.splice(0..0, q30.clone());
+        qual.extend(q30.clone());
+
         ReadPart {
             read_id: read_id,
             record_id: record_id,
@@ -83,16 +93,16 @@ impl ReadPart {
     }
 }
 
-fn get_readparts_idx(record: &bam::Record) -> Vec<(ReadParts_idx)> {
+fn get_readparts_idx(record: &bam::Record, chunk_window: usize) -> Vec<(ReadParts_idx)> {
     let cigar = record.cigar();
     let reference_id = record.reference_sequence_id().unwrap().unwrap();
     let mut readparts_idx = Vec::new();
     // debug!("{:?}",cigar);
     let start = record.alignment_start().unwrap().unwrap().get();
-    let mut windows_num = start / 5000;
-    let windows_left = start % 5000;
+    let mut windows_num = start / chunk_window;
+    let windows_left = start % chunk_window;
     let mut read_index = 0;
-    let mut need_bases = 5000 - windows_left;
+    let mut need_bases = chunk_window - windows_left;
     let mut start_pos = 0;
     let mut read_order = 0;
     let mut ref_pos = start - windows_left;
@@ -114,7 +124,7 @@ fn get_readparts_idx(record: &bam::Record) -> Vec<(ReadParts_idx)> {
                     windows_num += 1;
                     op -= need_bases;
                     read_index += need_bases;
-                    need_bases = 5000;
+                    need_bases = chunk_window;
                     // send readparts
                     // start_pos-read_index
                     // debug!("Match: Send readparts start:{} end:{}",start_pos,read_index);
@@ -129,7 +139,7 @@ fn get_readparts_idx(record: &bam::Record) -> Vec<(ReadParts_idx)> {
                     readparts_idx.push(readpart);
                     start_pos = read_index;
                     read_order += 1;
-                    ref_pos += 5000; // Increment ref_pos by 100
+                    ref_pos += chunk_window; // Increment ref_pos by 100
                 }
                 need_bases -= op;
                 read_index += op;
@@ -143,7 +153,7 @@ fn get_readparts_idx(record: &bam::Record) -> Vec<(ReadParts_idx)> {
                     // debug!("Deletion:windows_num:{} windows_left:{} read_index:{} need_bases:{}",windows_num,windows_left,read_index,need_bases);
                     windows_num += 1;
                     op -= need_bases;
-                    need_bases = 100;
+                    need_bases = chunk_window;
                     // send readparts
                     // start_pos-read_index
                     if start_pos != read_index {
@@ -159,7 +169,7 @@ fn get_readparts_idx(record: &bam::Record) -> Vec<(ReadParts_idx)> {
                         readparts_idx.push(readpart);
                         start_pos = read_index;
                         read_order += 1;
-                        ref_pos += 5000;
+                        ref_pos += chunk_window;
                     }
                 }
             }
@@ -169,7 +179,7 @@ fn get_readparts_idx(record: &bam::Record) -> Vec<(ReadParts_idx)> {
                 if start_pos == 0 {
                     start_pos += op;
                     read_index += op;
-                    read_order += (op / 100) + 1;
+                    read_order += (op / 200) + 1;
                 } else {
                     // send readparts
                     // start_pos-read_index
@@ -277,8 +287,10 @@ pub fn spawn_bam_reader(
                 let read_seq: Vec<u8> = record.sequence().iter().collect();
                 let read_qual: Vec<u8> = record.quality_scores().as_ref().to_vec();
                 // 计算record的分窗信息
-                let readparts_idx = get_readparts_idx(&record);
-
+                let readparts_idx = get_readparts_idx(&record, chunk_window);
+                if read_id == "TB2000CC3C-202406061734310_20240606183107_00177_000021521_11.46%4.2-F_3.7-R%00001.split.fastq.gz%-" {
+                    debug!("readparts_idx : {:?}", readparts_idx);
+                }
                 // 计算record的supplementary_alignment的数量，该reads的比对数量
                 let record_data = record.data();
                 let sa_tag: Option<Result<Value<'_>, std::io::Error>> = record_data.get(&SA);
@@ -325,8 +337,9 @@ pub fn spawn_bam_reader(
                     // 分窗内创建readpart结构
                     let readpart =
                         ReadPart::new(read_id.clone(),record_id.clone(), &read_seq, &read_qual, readpart_idx);
-
-
+                    if read_id == "TB2000CC3C-202406061734310_20240606183107_00177_000021521_11.46%4.2-F_3.7-R%00001.split.fastq.gz%-" {
+                        debug!("readpart : {:?}", readpart);
+                    }
                     // 将readpart根据染色体号和坐标信息为键合并进字典
                     let dict_key = (readpart_idx.chrom, readpart_idx.windows_num);
                     readparts_dict
@@ -334,15 +347,15 @@ pub fn spawn_bam_reader(
                         .or_insert_with(Vec::new)
                         .push(readpart.clone());
 
-                    if dict_key.0 == 0 && dict_key.1 == 178 {
-                        debug!("readparts_idx: {:?}",readparts_idx);
-                        debug!("read_id:{:?} read_seq: {:?}",read_id,std::str::from_utf8(&readpart.read_seq));
-                    }
+                    // if dict_key.0 == 0 && dict_key.1 == 178 {
+                    //     debug!("readparts_idx: {:?}",readparts_idx);
+                    //     debug!("read_id:{:?} read_seq: {:?}",read_id,std::str::from_utf8(&readpart.read_seq));
+                    // }
                     let dict_value = readparts_dict.get_mut(&dict_key).unwrap();
                     // 计算当前字典的键值中需要校正的readpart数量
                     let correct_count = dict_value.iter().filter(|rp| rp.need_correct()).count();
                     // 如果需要校正的readpart数量达到100，发送到rtx进入下游correct channel
-                    if correct_count == 1 {
+                    if correct_count == chunk_size {
                         // debug!(
                         //     "Send dict_value Chunk reads {:?} to correct chanel: {:?}",
                         //     correct_count, dict_key
@@ -372,8 +385,6 @@ pub fn spawn_bam_reader(
             info!("Loading Reads data done! Process record_count: {:?} readpart_count: {:?} Time elapsed: {:.4?}", record_count, readparts_count, elapsed_time);
         }
     });
-    //     let elapsed_time = start_time.elapsed();
-    //     info!("Loading Reads data done! Time elapsed: {:.4?}", elapsed_time)
     (rrx, readparts_num_dict)
 }
 

@@ -14,6 +14,7 @@ pub mod bam;
 
 fn main() {
     std::env::set_var("RUST_BACKTRACE", "1");
+    std::env::set_var("RUST_MIN_STACK", "8388608000");
     std::env::set_var("RUST_LOG", "debug");
     pretty_env_logger::init();
     let comands: Vec<String> = std::env::args().collect();
@@ -34,11 +35,12 @@ fn main() {
         // sleep 20s
         std::thread::sleep(std::time::Duration::from_secs(1));
         // debug!("{:?}",readparts_num_dict);
+        info!("start writing to fq.gz");
         writer::writer_receiver_bam(srx, &readparts_num_dict, &args.outfile);
         return;
     }else if args.inputs[0].ends_with(".fq") || args.inputs[0].ends_with(".fastq") || args.inputs[0].ends_with(".gz") {
         let rrx: flume::Receiver<fastq::ReadChunk> = fastq::spawn_reader(args.inputs, args.chunk_size, args.split_param, args.type_index, args.orient_index, args.limit);
-        let srx = fastq_handler::correcter_receiver(rrx, args.threads, args.correct_ratio, args.correct_fix_ratio);
+        let srx = fastq_handler::correcter_receiver(rrx, args.threads,100, args.correct_ratio, args.correct_fix_ratio);
         writer::writer_receiver(srx, &args.outfile);
         return;
     }

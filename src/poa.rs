@@ -11,7 +11,7 @@ use serde::{Serialize, Deserialize};
 use std::str::from_utf8;
 pub type POAGraph = Graph<u8, i32, Directed, usize>;
 pub const MIN_SCORE: i32 = -858_993_459; // negative infinity; see alignment/pairwise/mod.rs
-
+use log::debug;
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Serialize, Deserialize)]
 pub enum AlignmentOperation {
     Match(Option<(usize, usize, char)>), // added char for base type
@@ -474,9 +474,10 @@ impl<F: MatchFunc> Poa<F> {
 					i += 1;
 				}
 				AlignmentOperation::Match(Some((_, p, _))) => {
-					let node = NodeIndex::new(*p);
-					if (seq[i] != self.graph.raw_nodes()[*p].weight) && (seq[i] != b'X') {
-						let node = self.graph.add_node(seq[i]);
+					let mut node = NodeIndex::new(*p);
+                    let raw_node_weight = self.graph.raw_nodes()[*p].weight;
+					if (seq[i] != raw_node_weight){
+                        node = self.graph.add_node(seq[i]);
 						self.graph.add_edge(prev, node, 1);
 						prev = node;
 					} else {
@@ -495,7 +496,7 @@ impl<F: MatchFunc> Poa<F> {
 						}
 						prev = NodeIndex::new(*p);
 					}
-					node_indices.push(node); // 添加节点索引到向量
+                    node_indices.push(node); // 添加节点索引到向量
 					i += 1;
 				}
 				AlignmentOperation::Ins(None) => {
@@ -511,6 +512,9 @@ impl<F: MatchFunc> Poa<F> {
 				AlignmentOperation::Ins(Some(_)) => {
 					let node = self.graph.add_node(seq[i]);
 					node_indices.push(node); // 添加节点索引到向量
+                    // if node == NodeIndex::new(150) {
+                    //     debug!("op: {:?} prev node: {:?} node: {:?}",op, prev, node);
+                    // }
 					self.graph.add_edge(prev, node, 1);
 					prev = node;
 					i += 1;
@@ -590,6 +594,33 @@ impl<F: MatchFunc> Aligner<F> {
         self.poa.scoring.xclip_suffix = MIN_SCORE;
         self.poa.scoring.yclip_prefix = MIN_SCORE;
         self.poa.scoring.yclip_suffix = MIN_SCORE;
+
+        self.query = query.to_vec();
+        self.traceback = self.poa.custom(query);
+
+        // Set the clip penalties to the original values
+        self.poa.scoring.xclip_prefix = clip_penalties[0];
+        self.poa.scoring.xclip_suffix = clip_penalties[1];
+        self.poa.scoring.yclip_prefix = clip_penalties[2];
+        self.poa.scoring.yclip_suffix = clip_penalties[3];
+
+        self
+    }
+    /// Semi-globally align a given query against the graph.
+    pub fn semiglobal(&mut self, query: TextSlice) -> &mut Self {
+        // Store the current clip penalties
+        let clip_penalties = [
+            self.poa.scoring.xclip_prefix,
+            self.poa.scoring.xclip_suffix,
+            self.poa.scoring.yclip_prefix,
+            self.poa.scoring.yclip_suffix,
+        ];
+
+        // Temporarily Over-write the clip penalties
+        self.poa.scoring.xclip_prefix = MIN_SCORE;
+        self.poa.scoring.xclip_suffix = MIN_SCORE;
+        self.poa.scoring.yclip_prefix = 0;
+        self.poa.scoring.yclip_suffix = 0;
 
         self.query = query.to_vec();
         self.traceback = self.poa.custom(query);

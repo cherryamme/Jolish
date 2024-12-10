@@ -1,5 +1,9 @@
 ### 
 file=/home/jiangchen/project/Jolish/CYP21A2_Cyc/MCGD074-11-cyclone_correct.fq.gz
+file=/home/jiangchen/project/Jolish/example/softclip.fa
+file=/home/jiangchen/project/Jolish/benchmark2/debug.fa
+file=/home/jiangchen/project/Jolish/benchmark2/benchmark_1000_rawfq_correct_bam.fq
+file=/home/jiangchen/project/Jolish/test_bam_correct/559.1000reads.fq
 
 reference=/home/jiangchen/project/lrs_thal_pipeline/source/hg38_thal.mmi
 
@@ -12,11 +16,22 @@ minimap2  \
 
 
 ### 
+
+### generate examplefq
+file=/home/jiangchen/project/Jolish/example/bam_example.fq
+
+rg -z '%-$' -A3 '/home/jiangchen/project/Jolish/example/3.7_aaD/alpha_THAL226-34_hg38_hap1.fq.gz' |head -4000 > ${file}_raw.fq
+seqtk trimfq -b 2000 -L 500 ${file}_raw.fq |head -500 > $file
+
+
+### 
+
 ### minimap2 hg38
 file=/home/jiangchen/project/Jolish/CYP21A2_Cyc/MCGD074-11-cyclone_correct.fq.gz
 file=/home/jiangchen/project/Jolish/CYP21A2_Cyc/MCGD092-06-ONT.fa
+file=/home/jiangchen/project/Jolish/example/bam_example.fq
 
-reference=/home/jiangchen/00_software/reference/GRCh38/hg38.mmi
+reference=/home/jiangchen/project/lrs_thal_pipeline/source/hg38_thal.mmi
 
 bam=${file}.bam
 # minimap2 -x map-ont -t 8 $reference $file > ${file}.paf
@@ -57,11 +72,11 @@ Fec -x 1 -R -t $THREADS -r 0.6 -a 1000 -c 4 -l 2000 -m 0.005 -f 0.2 ovlp.paf cor
 
 ### 
 cd /home/jiangchen/project/Jolish/benchmark
-for i in 2000
+for i in 100
 do
 name=benchmark_$i
-rg -z '%-$' -A3 '/home/jiangchen/project/Jolish/example/3.7_aaD/alpha_THAL226-34_hg38_hap1.fq.gz' |head -4000 > ${name}_raw.fq
-seqtk trimfq -b 2000 -L $i ${name}_raw.fq > $name.fq
+rg -z '%-$' -A3 '/home/jiangchen/project/Jolish/example/3.7_aaD/alpha_THAL226-34_hg38_hap1.fq.gz' |head -400 > ${name}_raw.fq
+seqtk trimfq -b 2100 -L $i ${name}_raw.fq > $name.fq
 done
 ### 
 
@@ -105,5 +120,66 @@ abpoa_handle_py=/home/jiangchen/project/lrs_thal_pipeline/modules/abpoa_handle.p
 abpoa=/home/jiangchen/project/lrs_thal_pipeline/modules/abpoa
 
 python $abpoa_handle_py $abpoa /home/jiangchen/project/Jolish/benchmark/benchmark_1000.fq.gz 5 50 2> /dev/null | gzip > /home/jiangchen/project/Jolish/benchmark/benchmark_1000_abpoa.fq.gz
+
+### 
+
+
+### 错误率
+file=/home/jiangchen/project/Jolish/benchmark2/benchmark_1000_rawfq_correct_bam.fq.bam
+file=/home/jiangchen/project/Jolish/test_bam_correct/559.1000reads.fq.bam
+samtools stat $file |rg 'error rate'
+
+### 
+
+
+### Jolish run
+cargo build --release
+cp target/release/Jolish .
+./Jolish -i /home/jiangchen/project/Jolish/benchmark2/benchmark_1000.fq.bam -t 20 -o /home/jiangchen/project/Jolish/benchmark2/benchmark_1000_rawfq_correct_bam.fq
+
+### 
+
+
+### Jolish run
+cargo build --release
+cp target/release/Jolish .
+
+file=/home/jiangchen/project/Jolish/test_bam_correct/559.1000reads.fq.bam
+
+
+./Jolish -i $file -t 20 -w 100 -o $file.correct.fq.gz
+# ./version_V0.0.1/Jolish -i $file -t 20 -o $file.correct.fq.gz
+
+reference=/home/jiangchen/project/lrs_thal_pipeline/source/hg38_thal.mmi
+
+bam=${file}_correct.bam
+# minimap2 -x map-ont -t 8 $reference $file > ${file}.paf
+minimap2  \
+            --MD -ax map-ont -t 4 -L --secondary=no -Y \
+            $reference \
+            $file.correct.fq.gz | samtools sort -@2 -m 256Mb -T $(dirname $file)/temp -o ${bam} - && samtools index ${bam}
+samtools stat ${bam} |rg 'error rate'
+### 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### 
+
+./version_V0.0.1/Jolish -i /home/jiangchen/project/Jolish/benchmark2/benchmark_1000.fq -t 20 -o /home/jiangchen/project/Jolish/benchmark2/benchmark_1000_rawfq_correct_bam.fq
 
 ### 

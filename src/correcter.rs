@@ -40,47 +40,58 @@ impl Correcter {
 		self.graph.edges(from_node).map(|edge| *edge.weight()).sum()
 	}
 	// 获取从一个节点到另一个节点的边的权重
-    fn get_edge_weight(&self, from: NodeIndex<usize>, to: NodeIndex<usize>) -> Result<i32, std::io::Error> {
-        match self.graph.find_edge(from, to) {
-            Some(edge) => Ok(*self.graph.edge_weight(edge).unwrap()),
-            None => Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                format!("Edge not found between nodes {:?} and {:?}", from, to),
-            )),
-        }
+    fn get_edge_weight(&self, from: NodeIndex<usize>, to: NodeIndex<usize>) -> Result<i32> {
+        let edge = self.graph.find_edge(from, to)
+            .context(format!("Edge not found between nodes {:?} and {:?}", from, to))?;
+        
+        let weight = self.graph.edge_weight(edge)
+            .context("Edge weight not found")?;
+        
+        Ok(*weight)
     }
 	// 判断是否启用启发式校正
-    fn is_heuristic_correction_enabled(&self, from: NodeIndex<usize>, to: NodeIndex<usize>, correct_ratio: f64) -> Result<bool> {
-        let from_weight_sum = self.get_outcome_weight_sum(from);
-        let edge_weight = self.get_edge_weight(from, to)?;
-        // let edge_weight_test = self.get_edge_weight(NodeIndex::new(206), NodeIndex::new(207))?;
-		// debug!("(is_heuristic_correction_enabled):edge_weight_test 206->207: {:?}", edge_weight_test);
-        let weight_ratio = edge_weight as f64 / from_weight_sum as f64;
-		// if weight_ratio == 0.2 {
-		// 	use petgraph::Direction;
-		// 	for edge in self.graph.edges_directed( NodeIndex::new(206), Direction::Outgoing) {
-		// 		let target = edge.target();
-		// 		let weight = edge.weight();
-		// 		println!(
-		// 			"Edge from {:?} to {:?} with weight: {:?}",
-		// 			206, target, weight
-		// 		);
-		// 	}
-		// }
+    fn is_heuristic_correction_enabled(&self, from: NodeIndex<usize>, to: NodeIndex<usize>, correct_ratio: f64, correct_fix_ratio: f64) -> Result<bool> {
+        if from == NodeIndex::new(7) {
+			// debug!("(is_heuristic_correction_enabled):from: {:?}, to: {:?}", from, to);
+			return Ok(false);
+		}
+		let from_weight_sum = self.get_outcome_weight_sum(from);
+		if from_weight_sum == 0 {
+			// No outgoing edges from 'from' node
+			return Ok(false);
+		}
+		let mut has_edge_ge_ratio = false;
+		for edge in self.graph.edges(from) {
+			let weight_ratio = *edge.weight() as f64 / from_weight_sum as f64;
+			if weight_ratio >= correct_fix_ratio {
+				has_edge_ge_ratio = true;
+				break;
+			}
+		}
+		if !has_edge_ge_ratio {
+			// No edge with weight_ratio >= correct_fix_ratio
+			return Ok(false);
+		}
+		let edge_weight = self.get_edge_weight(from, to)?;
+		let weight_ratio = edge_weight as f64 / from_weight_sum as f64;
         // debug!("(is_heuristic_correction_enabled):weight_ratio: {:?}, from: {:?}, from_weight_sum: {:?}, to: {:?}, edge_weight: {:?}", weight_ratio, from, from_weight_sum, to, edge_weight);
-        Ok(weight_ratio <= correct_ratio)
+		Ok(weight_ratio < correct_ratio)
     }
-	fn heuristic_finder(&self, mut heuristic_path: Heuristic_path, indices: &Indices, correct_fix_ratio: f64, depth: usize) -> Result<(Indices, usize)> {
-		if depth <0 {
+	fn heuristic_finder(&self,mut heuristic_path: Heuristic_path, indices: &Indices, correct_fix_ratio: f64, depth: usize) -> Result<(Indices, usize)> {
+		if depth >1000 {
 			// Reached maximum recursion depth
 			return Err(anyhow::anyhow!("Maximum recursion depth reached"));
-		}
-	
+		};
 		let mut new_heuristic_path = Vec::new();
+		// let mut best_path = Vec::new();
+		// let mut min_weight: usize = 0;
+		// let mut min_index = 0;
 		for i in 0..heuristic_path.path.len() {
 			let from_node = heuristic_path.path[i].last().unwrap();
 			let outcome_weight_sum = self.get_outcome_weight_sum(*from_node);
+			// debug!("outcome_weight_sum: {:?}", outcome_weight_sum);
 			if outcome_weight_sum == 0 {
+				// 到了尾节点，添加进outpath
 				heuristic_path.outpath.push(heuristic_path.path[i].clone());
 				heuristic_path.weight.push(indices.len());
 				continue;
@@ -90,44 +101,55 @@ impl Correcter {
 				let edge_weight = *edge.weight();
 				let weight_ratio = edge_weight as f64 / outcome_weight_sum as f64;
 				if weight_ratio >= correct_fix_ratio {
+					// 新建一个新的路径，添加到new_heuristic_path
 					let mut new_path = heuristic_path.path[i].clone();
 					new_path.push(to_node);
 					new_heuristic_path.push(new_path.clone());
+					// 如果to_node在indices中，添加到new_heuristic_outpath
 					if indices.contains(&to_node) {
 						heuristic_path.outpath.push(new_path);
+						// 找到 to_node 在 indices 中的索引位置
 						if let Some(position) = indices.iter().position(|&x| x == to_node) {
 							heuristic_path.weight.push(position);
 						} else {
-							panic!("heuristic_finder to_node not found in indices");
+						// 如果无法找到 to_node 的位置，根据需求可以做一些处理
+						panic!("heuristic_finder to_node not found in indices");
 						}
 					}
 				}
 			}
+			// debug!("(heuristic_finder):heuristic_path: {:?} new_heuristic_outpath: {:?}", heuristic_path, heuristic_path.outpath);
 		}
-	
+
 		heuristic_path.path = new_heuristic_path;
 		let (best_path, min_weight) = if heuristic_path.outpath.is_empty() {
-			self.heuristic_finder(heuristic_path, indices, correct_fix_ratio, depth + 1)?
+			// debug!("new_heuristic_outpath is empty");
+			// debug!("heuristic_path: {:?}", heuristic_path);
+			self.heuristic_finder(heuristic_path, indices, correct_fix_ratio , depth + 1)?
 		} else {
 			let (min_index, &min_weight) = heuristic_path.weight.iter()
 				.enumerate()
 				.min_by_key(|&(_, weight)| *weight)
-				.unwrap();
+				.unwrap(); // Assuming there is at least one element
 			let mut best_path: Vec<NodeIndex<usize>> = heuristic_path.outpath[min_index].clone();
 			best_path.drain(0..1);
+			// debug!("heuristic_finder:min_weight: {:?}", min_weight);
+			// debug!("heuristic_finder:best_path: {:?}", best_path);
 			(best_path, min_weight)
 		};
-		Ok((best_path, min_weight))
+		return Ok((best_path,min_weight))
 	}
-	
 
 
 	// 启发式校正
-	pub fn heuristic_correct(&self, from: NodeIndex<usize>, indices: &Indices, correct_fix_ratio: f64) -> Result<(Indices, usize)> {
+	pub fn heuristic_correct(&self, from: NodeIndex<usize>,indices : &Indices, correct_fix_ratio: f64) ->  Result<(Indices,usize)> {
 		let heuristic_path = Heuristic_path::new(vec![vec![from]]);
-		self.heuristic_finder(heuristic_path, indices, correct_fix_ratio, 0)
+		// debug!("heuristic_path: {:?} Indices: {:?}", heuristic_path, indices);
+		let (best_path,min_index) = self.heuristic_finder(heuristic_path, indices, correct_fix_ratio, 0)?;
+		// debug!("best_path: {:?}", best_path);
+		return Ok((best_path,min_index));
 	}
-	
+
 
 
 	// 校正
@@ -135,26 +157,31 @@ impl Correcter {
 		let mut correct_indices = Vec::new();
 		let mut correct_qual: Vec<u8> = Vec::new();
 		let mut i = 1;
-		correct_indices.push(indices[0]);
+		correct_indices.push( indices[0]);
 		correct_qual.push(qual[0]);
+		// debug!("(correct_indices) raw indices(len:{}): {:?}", indices.len(), indices);
 		while i < indices.len() {
-			let from_node = indices[i - 1].clone();
+			let from_node = indices[i-1].clone();
 			let to_node = indices[i].clone();
-			let heuristic_enabled = self.is_heuristic_correction_enabled(from_node, to_node, correct_ratio).unwrap_or(false);
+			let heuristic_enabled = self.is_heuristic_correction_enabled(from_node, to_node, correct_ratio, correct_fix_ratio)?;
 			if heuristic_enabled {
-				let (best_path, min_weight) = self.heuristic_correct(from_node, indices, correct_fix_ratio)?;
+				let (best_path,min_weight) = self.heuristic_correct(from_node, indices, correct_fix_ratio)?;
 				correct_qual.extend(vec![63; best_path.len()]);
 				correct_indices.extend(best_path);
+				// debug!("correct_indices: {:?}", correct_indices);
+				// debug!("min_weight: {:?}", min_weight);
+				// 将循环跳转到i = min_index
 				i = min_weight + 1;
 			} else {
 				correct_indices.push(to_node);
 				correct_qual.push(qual[i]);
 				i += 1;
 			}
+
 		}
+		// debug!("final correct_indices(len:{}): {:?}", correct_indices.len(), correct_indices);
 		Ok((correct_indices, correct_qual))
 	}
-
 	// 将indices替换为碱基向量
 	pub fn replace_with_node_weights(&self, indices: &Indices) -> Vec<u8> {
 		let mut correct_seq: Vec<u8> = Vec::with_capacity(indices.len()); // 预先分配足够的容量
@@ -183,7 +210,7 @@ fn test_main(){
 #[test]
 fn test_correcter() {
 	pretty_env_logger::init();
-	debug!("test_correcter");
+	// debug!("test_correcter");
 	let mut graph: Graph<u8, i32, Directed, usize> =
 		Graph::with_capacity(10, 9);
 	let a = graph.add_node("A".as_bytes()[0]);
@@ -201,7 +228,7 @@ fn test_correcter() {
 	debug!("b_weight_sum: {}", b_weight_sum);
 	let edge_weight = correcter.get_edge_weight(a, c);
 	debug!("edge_weight: {:?}", edge_weight);
-	let is_heuristic_correction_enabled = correcter.is_heuristic_correction_enabled(a, c,  0.2);
+	let is_heuristic_correction_enabled = correcter.is_heuristic_correction_enabled(a, c,  0.2, 0.2);
 	debug!("is_heuristic_correction_enabled: {:?}", is_heuristic_correction_enabled);
 	// let (correct_indices,correct_qual) = correcter.correct_indices(&indices);
 	// debug!("correct_indices: {:?}", correct_indices);

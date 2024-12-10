@@ -88,10 +88,14 @@ pub fn assemble_read_parts(read_parts: &[&ReadPart], orient: &str) -> (String, S
         } else {
             (&rp.read_seq, &rp.read_qual)
         };
-        // debug!("rp {:?}", rp);
-        record_seq.push_str(std::str::from_utf8(seq).expect("Not a valid UTF-8 sequence"));
+        // Remove the first and last eight bases
+        let trimmed_seq = &seq[8..seq.len() - 8];
+        let trimmed_qual = &qual[8..qual.len() - 8];
+
+        record_seq.push_str(std::str::from_utf8(trimmed_seq).expect("Not a valid UTF-8 sequence"));
         // Add 33 to each quality value since they've been subtracted by 33
-        record_qual.extend(qual.iter().map(|&q| q + 33));
+        record_qual.extend(trimmed_qual.iter().map(|&q| q + 33));
+    
     }
 
     let seq = if orient == "+" {

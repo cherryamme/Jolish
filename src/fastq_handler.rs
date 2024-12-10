@@ -13,22 +13,19 @@ use std::thread;
 use std::time::Instant;
 use anyhow::{Context, Result};
 
-
-
-
-pub struct FastqHandler {
+pub struct CorrectHandler {
     pub correcter: Correcter,
     pub read_chunk: ReadChunk,
     pub graph: POAGraph,
     pub correct_ratio: f64,
     pub correct_fix_ratio: f64,
 }
-impl FastqHandler {
-    pub fn new(read_chunk: ReadChunk, correct_ratio: f64, correct_fix_ratio: f64) -> FastqHandler {
+impl CorrectHandler {
+    pub fn new(read_chunk: ReadChunk, correct_ratio: f64, correct_fix_ratio: f64) -> CorrectHandler {
         let mut read_chunk = read_chunk;
         let graph = Self::build_graph(&mut read_chunk);
         let correcter = Correcter::new("test".to_string(), graph.clone());
-        FastqHandler {
+        CorrectHandler {
             correcter: correcter,
             read_chunk: read_chunk,
             graph: graph,
@@ -60,33 +57,24 @@ impl FastqHandler {
             //     &read_info.seq_node_index,
             //     &read_info.record.qual().to_owned(),
             // );
-            let (correct_indices, correct_qual) = match self.correcter.correct_indices(
-				&read_info.seq_node_index,
-				&read_info.record.qual().to_owned(),
-				self.correct_ratio,
-				self.correct_fix_ratio,
-			) {
-				Ok((indices, qual)) => (indices, qual),
-				Err(e) => {
-					debug!(
-						"Error correcting indices for read_info with ID: {}: {:?}",
-						read_info.read_id, e
-					);
-					// Optionally, log a portion of the data to avoid stack overflow
-					debug!(
-						"Sequence Node Index (first 10): {:?}",
-						&read_info.seq_node_index[..read_info.seq_node_index.len().min(10)]
-					);
-					debug!(
-						"Quality Scores (first 10): {:?}",
-						&read_info.record.qual().to_owned()[..read_info.record.qual().to_owned().len().min(10)]
-					);
-					(
-						read_info.seq_node_index.clone(),
-						read_info.record.qual().to_owned().clone(),
-					)
-				}
-			};
+            let (correct_indices, correct_qual) = self.correcter.correct_indices(
+                &read_info.seq_node_index,
+                &read_info.record.qual().to_owned(),
+                self.correct_ratio,
+                self.correct_fix_ratio,
+            ).unwrap_or_else(|e| {
+                // Print debugging information when an error occurs
+                println!("Error correcting indices for read_info with ID: {}", read_info.read_id);
+                println!("Debugging Information:");
+                println!("Sequence Node Index: {:?}", read_info.seq_node_index);
+                println!("Quality Scores: {:?}", read_info.record.qual());
+                println!("Error: {:?}", e);
+                let g: Graph<char, i32, Directed, usize> = self.graph.map(|_, n| (*n) as char, |_, e| *e);
+                info!("Dot graph:\n{:?}", Dot::new(&g));
+                // Optionally, panic or handle the error in another way
+                panic!("Failed to correct indices: {:?}", e);
+            });
+            
             // .expect(&format!("Error correcting indices for read_info with ID: {}", read_info.read_id));
 
             read_info.correct_seq = self.correcter.replace_with_node_weights(&correct_indices);
@@ -102,6 +90,7 @@ impl FastqHandler {
 pub fn correcter_receiver(
     rrx: Receiver<ReadChunk>,
     threads: usize,
+    chunksize: usize,
     correct_ratio: f64,
     correct_fix_ratio: f64,
 ) -> Receiver<ReadChunk> {
@@ -116,7 +105,7 @@ pub fn correcter_receiver(
             for readchunk in rrx.iter() {
                 chunk_count += 1;
                 chunk_reads_num += readchunk.reads_num();
-                let mut ch = FastqHandler::new(readchunk, correct_ratio, correct_fix_ratio);
+                let mut ch = CorrectHandler::new(readchunk, correct_ratio, correct_fix_ratio);
                 ch.correct_reads();
                 ch.info();
                 // info!("read1: {}", matched_reads.to_tsv());
