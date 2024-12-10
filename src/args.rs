@@ -21,8 +21,8 @@ pub struct Args {
     #[arg(short, long, default_value = "outfile.fq.gz")]
     pub outfile: String,
     /// Nunber of max reads to process
-    #[arg(short, long)]
-    pub limit: Option<usize>,
+    #[arg(short='M', long)]
+    pub max_reads: Option<usize>,
     /// Number of threads
     #[arg(short, long, default_value = "10")]
     pub threads: usize,
@@ -36,10 +36,10 @@ pub struct Args {
     #[arg(short, long, default_value = "100")]
     pub chunk_size: usize,
     /// correct_ratio
-    #[arg(short = 'r', long, default_value = "0.2")]
+    #[arg(long = "cr", default_value = "0.3")]
     pub correct_ratio: f64,
     /// correct_fix_ratio
-    #[arg(short = 'f', long, default_value = "0.2")]
+    #[arg(long = "cfr", default_value = "0.3")]
     pub correct_fix_ratio: f64,
     /// split_param
     #[arg(long = "id_sep", default_value = "%")]
@@ -50,4 +50,7 @@ pub struct Args {
     /// orient_index
     #[arg(short = 's', long = "strand", default_value = "3")]
     pub orient_index: usize,
+    /// The region to extract (e.g., chr1:1000-2000)
+	#[arg(short, long)]
+	pub region: Option<String>,
 }

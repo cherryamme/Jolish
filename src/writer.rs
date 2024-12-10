@@ -3,7 +3,6 @@ use flate2::write::GzEncoder;
 use flate2::Compression;
 use log::debug;
 use log::info;
-use noodles::bam::record;
 use std::fs::File;
 use std::hash::Hash;
 use std::io::Write;

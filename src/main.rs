@@ -22,24 +22,25 @@ fn main() {
     info!("Run Command: {:?}", comands);
     info!("Args: {:?}", args);
     // // 判断inputs是bam还是fastq，使用不同的handler
-    // args.inputs.push("/home/jiangchen/project/Jolish/benchmark2/benchmark_1000.fq".to_string());
-    // args.outfile = "/home/jiangchen/project/Jolish/benchmark2/benchmark_1000_correct.fq.gz".to_string();
+    // args.inputs.push("/home/jiangchen/project/Jolish/test_hts/559.1000reads.fq.bam".to_string());
+    args.inputs.push("/home/jiangchen/project/Jolish/example/softclip.fa.bam".to_string());
+    // args.outfile = "/home/jiangchen/project/Jolish/test_hts/559.1000reads.fq.bam.fq.gz".to_string();
     if args.inputs[0].ends_with(".bam") {
-        let (rrx, readparts_num_dict) = bam::spawn_bam_reader(args.inputs, args.chunk_size, args.chunk_window, args.limit);
+        let (rrx, readparts_num_dict) = bam::spawn_bam_reader(args.inputs, args.chunk_size, args.chunk_window, args.max_reads, args.region);
+        
         let srx = bam_handler::correcter_receiver(rrx, args.threads, args.correct_ratio, args.correct_fix_ratio);
         // for readchunk in srx.iter(){
         //     for read in readchunk.iter(){
         //         info!("read id is {:?}",read);
         //     }
         // }
-        // sleep 20s
         std::thread::sleep(std::time::Duration::from_secs(1));
-        // debug!("{:?}",readparts_num_dict);
+        debug!("{:?}",readparts_num_dict);
         info!("start writing to fq.gz");
         writer::writer_receiver_bam(srx, &readparts_num_dict, &args.outfile);
         return;
     }else if args.inputs[0].ends_with(".fq") || args.inputs[0].ends_with(".fastq") || args.inputs[0].ends_with(".gz") {
-        let rrx: flume::Receiver<fastq::ReadChunk> = fastq::spawn_reader(args.inputs, args.chunk_size, args.split_param, args.type_index, args.orient_index, args.limit);
+        let rrx: flume::Receiver<fastq::ReadChunk> = fastq::spawn_reader(args.inputs, args.chunk_size, args.split_param, args.type_index, args.orient_index, args.max_reads);
         let srx = fastq_handler::correcter_receiver(rrx, args.threads,100, args.correct_ratio, args.correct_fix_ratio);
         writer::writer_receiver(srx, &args.outfile);
         return;

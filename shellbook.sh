@@ -3,7 +3,7 @@ file=/home/jiangchen/project/Jolish/CYP21A2_Cyc/MCGD074-11-cyclone_correct.fq.gz
 file=/home/jiangchen/project/Jolish/example/softclip.fa
 file=/home/jiangchen/project/Jolish/benchmark2/debug.fa
 file=/home/jiangchen/project/Jolish/benchmark2/benchmark_1000_rawfq_correct_bam.fq
-file=/home/jiangchen/project/Jolish/test_bam_correct/559.1000reads.fq
+file=/home/jiangchen/project/Jolish/test_3methods_run/alpha_THAL226-34_hg38_hap1.fq.gz
 
 reference=/home/jiangchen/project/lrs_thal_pipeline/source/hg38_thal.mmi
 
@@ -30,6 +30,7 @@ seqtk trimfq -b 2000 -L 500 ${file}_raw.fq |head -500 > $file
 file=/home/jiangchen/project/Jolish/CYP21A2_Cyc/MCGD074-11-cyclone_correct.fq.gz
 file=/home/jiangchen/project/Jolish/CYP21A2_Cyc/MCGD092-06-ONT.fa
 file=/home/jiangchen/project/Jolish/example/bam_example.fq
+file=/home/jiangchen/project/Jolish/test_3methods_run/alpha_THAL226-34_hg38_hap2.fq.gz
 
 reference=/home/jiangchen/project/lrs_thal_pipeline/source/hg38_thal.mmi
 
@@ -115,18 +116,24 @@ counterr -bam $file -genome $reference -output_dir $outdir -len_min_read 10 -map
 ### 
 
 
-### abpoachunk
+### abpoa chunk error
 abpoa_handle_py=/home/jiangchen/project/lrs_thal_pipeline/modules/abpoa_handle.py
 abpoa=/home/jiangchen/project/lrs_thal_pipeline/modules/abpoa
+reference=/home/jiangchen/project/lrs_thal_pipeline/source/hg38_thal.mmi
 
-python $abpoa_handle_py $abpoa /home/jiangchen/project/Jolish/benchmark/benchmark_1000.fq.gz 5 50 2> /dev/null | gzip > /home/jiangchen/project/Jolish/benchmark/benchmark_1000_abpoa.fq.gz
-
+file=/home/jiangchen/project/Jolish/test_3methods_run/alpha_THAL226-34_hg38_hap2.fq.gz
+python $abpoa_handle_py $abpoa $file 5 50 2> /dev/null | gzip > $file.abpoa.fq.gz
+minimap2  \
+            --MD -ax map-ont -t 4 -L --secondary=no -Y \
+            $reference \
+            $file.abpoa.fq.gz | samtools sort -@2 -m 256Mb -T $(dirname $file)/temp -o $file.abpoa.bam - && samtools index $file.abpoa.bam
+samtools stat $file.abpoa.bam |rg 'error rate'
 ### 
 
 
 ### 错误率
 file=/home/jiangchen/project/Jolish/benchmark2/benchmark_1000_rawfq_correct_bam.fq.bam
-file=/home/jiangchen/project/Jolish/test_bam_correct/559.1000reads.fq.bam
+file=/home/jiangchen/project/Jolish/test_hts/559.1000reads.fq.bam
 samtools stat $file |rg 'error rate'
 
 ### 
@@ -144,10 +151,10 @@ cp target/release/Jolish .
 cargo build --release
 cp target/release/Jolish .
 
-file=/home/jiangchen/project/Jolish/test_bam_correct/559.1000reads.fq.bam
+file=/home/jiangchen/project/Jolish/example/softclip.fa.bam
 
 
-./Jolish -i $file -t 20 -w 100 -o $file.correct.fq.gz
+./Jolish -i $file -t 20  -w 100 -o $file.correct.fq.gz
 # ./version_V0.0.1/Jolish -i $file -t 20 -o $file.correct.fq.gz
 
 reference=/home/jiangchen/project/lrs_thal_pipeline/source/hg38_thal.mmi

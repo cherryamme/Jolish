@@ -52,11 +52,11 @@ impl BamHandler {
             // }
 			read_info.seq_node_index = aligner.add_to_graph_and_correct();
             // if read_info.read_id == "TB2000CC3C-202406061734310_20240607020019_00729_003441578_12.17" {
-                if read_info.read_id == "TB2000CC3C-202406061734310_20240606183107_00177_000021521_11.46%4.2-F_3.7-R%00001.split.fastq.gz%-" {
-                    debug!("readid op: {:?}", aligner.alignment());
-                    debug!("readinfo: {:?}", read_info);
-                    debug!("readid seq: {:?}", std::str::from_utf8(&read_info.read_seq));
-                }
+                // if read_info.read_id == "TB2000CC3C-202406061734310_20240606183107_00177_000021521_11.46%4.2-F_3.7-R%00001.split.fastq.gz%-" {
+                //     debug!("readid op: {:?}", aligner.alignment());
+                //     debug!("readinfo: {:?}", read_info);
+                //     debug!("readid seq: {:?}", std::str::from_utf8(&read_info.read_seq));
+                // }
             //     info!("read_id:{} {:?}",read_info.read_id,aligner.alignment());
             // }
         }
@@ -77,8 +77,8 @@ impl BamHandler {
 			) {
 				Ok((indices, qual)) => (indices, qual),
 				Err(e) => {
-					// let g: Graph<char, i32, Directed, usize> = self.graph.map(|_, n| (*n) as char, |_, e| *e);
-					// debug!("Dot graph:\n{:?}", Dot::new(&g));
+					let g: Graph<char, i32, Directed, usize> = self.graph.map(|_, n| (*n) as char, |_, e| *e);
+					debug!("Dot graph:\n{:?}", Dot::new(&g));
 					// debug!(
 					// 	"Graph: {:?}",
 					// 	self.graph.map(|_, n| (*n) as char, |_, e| *e)
@@ -140,10 +140,6 @@ pub fn correcter_receiver(
             let mut chunk_reads_num = 0;
             for readchunk in rrx.iter() {
                 chunk_count += 1;
-                debug!(
-                    "threads {} process {} chunks {} reads.",
-                    t, chunk_count, chunk_reads_num
-                );
                 // 过滤出需要校正的 reads
                 let (correct_chunk, uncorrected_chunk): (Vec<_>, Vec<_>) =
                     readchunk.into_iter().partition(|rp| rp.need_correct());
