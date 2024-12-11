@@ -115,9 +115,9 @@ impl ReadPart {
 pub fn get_readparts_idx(record: &Record, chunk_window: i64) -> Vec<ReadParts_idx> {
     let infos = record.aligned_pairs();
     let softclip_len = record.cigar().leading_softclips();
-    let mut chunk_start = 0;
+    let mut chunk_start = softclip_len;
     let mut windows_num = record.pos() / chunk_window;
-    let mut reader_order = softclip_len as usize;
+    let mut reader_order = (softclip_len / chunk_window) as usize;
     let mut readparts_idxs = Vec::new();
     // debug!("leading_softclips:{:?}  record.pos: {:?} reference_start:{:?}",record.cigar().leading_softclips(),record.pos(),record.reference_start());
     for info in infos {

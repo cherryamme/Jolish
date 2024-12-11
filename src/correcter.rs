@@ -78,7 +78,7 @@ impl Correcter {
 		Ok(weight_ratio < correct_ratio)
     }
 	fn heuristic_finder(&self,mut heuristic_path: Heuristic_path, indices: &Indices, correct_fix_ratio: f64, depth: usize) -> Result<(Indices, usize)> {
-		if depth >1000 {
+		if depth >50 {
 			// Reached maximum recursion depth
 			return Err(anyhow::anyhow!("Maximum recursion depth reached"));
 		};

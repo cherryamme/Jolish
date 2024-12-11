@@ -164,7 +164,9 @@ pub fn writer_receiver_bam(
                     // TODO 创建一个函数，输入record_info，read_parts，将read_parts按照record_info分组处理，返回一个record_str
 
                     let mut sorted_parts: Vec<_> = read_parts.iter().collect();
+                    // 按照read_rank排序，并进行去重
                     sorted_parts.sort_by_key(|rp| rp.read_rank);
+                    sorted_parts.dedup_by_key(|rp| rp.read_rank);
                     let (record_seq,record_qual) = assemble_read_parts(&sorted_parts, &readpartsnumdictvalue.orient);
                     let record_str =
                         format!("@{}\n{}\n+\n{}\n", read_id, record_seq, record_qual);

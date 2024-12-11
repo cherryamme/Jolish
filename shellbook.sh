@@ -31,6 +31,7 @@ file=/home/jiangchen/project/Jolish/CYP21A2_Cyc/MCGD074-11-cyclone_correct.fq.gz
 file=/home/jiangchen/project/Jolish/CYP21A2_Cyc/MCGD092-06-ONT.fa
 file=/home/jiangchen/project/Jolish/example/bam_example.fq
 file=/home/jiangchen/project/Jolish/test_3methods_run/alpha_THAL226-34_hg38_hap2.fq.gz
+file=/home/jiangchen/project/Jolish/test_Trans_SNV/alpha_THAL250-11_2000reads.fq.gz
 
 reference=/home/jiangchen/project/lrs_thal_pipeline/source/hg38_thal.mmi
 
@@ -121,8 +122,8 @@ abpoa_handle_py=/home/jiangchen/project/lrs_thal_pipeline/modules/abpoa_handle.p
 abpoa=/home/jiangchen/project/lrs_thal_pipeline/modules/abpoa
 reference=/home/jiangchen/project/lrs_thal_pipeline/source/hg38_thal.mmi
 
-file=/home/jiangchen/project/Jolish/test_3methods_run/alpha_THAL226-34_hg38_hap2.fq.gz
-python $abpoa_handle_py $abpoa $file 5 50 2> /dev/null | gzip > $file.abpoa.fq.gz
+file=/home/jiangchen/project/Jolish/test_Trans_SNV/alpha_THAL250-11_2000reads.fq.gz
+time python $abpoa_handle_py $abpoa $file 5 50 2> /dev/null | gzip > $file.abpoa.fq.gz
 minimap2  \
             --MD -ax map-ont -t 4 -L --secondary=no -Y \
             $reference \
@@ -154,7 +155,7 @@ cp target/release/Jolish .
 file=/home/jiangchen/project/Jolish/test_3methods_run/alpha_THAL226-34_hg38_hap1.fq.gz.bam
 
 
-./Jolish -i $file -t 20  -w 100 -o $file.correct.fq.gz
+/home/jiangchen/project/Jolish/Jolish -i $file -t 20  -w 100 -o $file.correct.fq.gz
 # ./version_V0.0.1/Jolish -i $file -t 20 -o $file.correct.fq.gz
 
 reference=/home/jiangchen/project/lrs_thal_pipeline/source/hg38_thal.mmi

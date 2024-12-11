@@ -39,6 +39,7 @@ impl BamHandler {
     }
 
     pub fn build_graph(read_chunk: &mut ReadPartChunk) -> POAGraph {
+        // let start = Instant::now();
         let first_read = &mut read_chunk[0];
         let scoring = Scoring::new(-1, 0, |a: u8, b: u8| if a == b { 3 } else { -4 });
         let mut aligner = Aligner::new(scoring, &first_read.read_seq);
@@ -60,6 +61,20 @@ impl BamHandler {
             //     info!("read_id:{} {:?}",read_info.read_id,aligner.alignment());
             // }
         }
+        // let duration = start.elapsed();
+        // 计算graph中有多少个节点
+        // NOTE debug 过程使用：用于判断是否在build_graph过程中出现问题
+        // let node_count = aligner.graph().node_count();
+        // debug!("Time elapsed in building graph() is: {:?}; graph node count: {}", duration, node_count);
+        // if node_count == 4325 || node_count == 205 {
+        //     for readinfo in read_chunk {
+        //         debug!("read_id: {}", readinfo.read_id);
+        //         debug!("readinfo.rank {}, readinfo.seq:{:?}", readinfo.read_rank,std::str::from_utf8(&readinfo.read_seq))
+
+        //     }
+        //     let g: Graph<char, i32, Directed, usize> = aligner.graph().map(|_, n| (*n) as char, |_, e| *e);
+		// 			debug!("Dot graph:\n{:?}", Dot::new(&g));
+        // }
         // info!("{:?}",read_chunk.ids());
         aligner.graph().clone()
     }

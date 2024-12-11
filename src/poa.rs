@@ -377,6 +377,111 @@ impl<F: MatchFunc> Poa<F> {
 		}
 		traceback
 	}
+        /// A global Needleman-Wunsch aligner on partially ordered graphs with banding.
+    ///
+    /// # Arguments
+    /// * `query` - the query TextSlice to align against the internal graph member
+    /// * `bandwidth` - width of band, if too small, alignment may be suboptimal
+    pub fn global_banded(&self, query: TextSlice, bandwidth: usize) -> Traceback {
+        assert!(self.graph.node_count() != 0);
+
+        // dimensions of the traceback matrix
+        let (m, n) = (self.graph.node_count(), query.len());
+        let mut traceback = Traceback::with_capacity(m, n);
+        traceback.initialize_scores(self.scoring.gap_open, self.scoring.yclip_prefix);
+        
+        traceback.set(
+            0,
+            0,
+            TracebackCell {
+                score: 0,
+                op: AlignmentOperation::Match(None),
+            },
+        );
+        
+        // construct the score matrix (O(n^2) space)
+        // but this sucks, we want linear time!!!
+        // at each row i we want to find the max scoring j
+        // and band
+        let mut max_scoring_j = 0;
+        let mut max_score_for_row = MIN_SCORE;
+        let mut topo = Topo::new(&self.graph);
+        while let Some(node) = topo.next(&self.graph) {
+            // reference base and index
+            let r = self.graph.raw_nodes()[node.index()].weight; // reference base at previous index
+            let r_char = char::from(r);
+            let i = node.index() + 1; // 0 index is for initialization so we start at 1
+            traceback.last = node;
+            // iterate over the predecessors of this node
+            let prevs: Vec<NodeIndex<usize>> =
+                self.graph.neighbors_directed(node, Incoming).collect();
+            let start = if bandwidth > max_scoring_j {
+                0
+            } else {
+                max_scoring_j - bandwidth
+            };
+            let end = max_scoring_j + bandwidth;
+            traceback.new_row(
+                i,
+                (end - start) + 1,
+                self.scoring.gap_open,
+                self.scoring.xclip_prefix,
+                start,
+                end + 1,
+            );
+            for (query_index, query_base) in query.iter().enumerate().skip(start) {
+                let j = query_index + 1; // 0 index is initialized so we start at 1
+                if j > end {
+                    break;
+                }
+                let max_cell = if prevs.is_empty() {
+                    TracebackCell {
+                        score: traceback.get(0, j - 1).score
+                            + self.scoring.match_fn.score(r, *query_base),
+                        op: AlignmentOperation::Match(None),
+                    }
+                } else {
+                    let mut max_cell = TracebackCell {
+                        score: MIN_SCORE,
+                        op: AlignmentOperation::Match(None),
+                    };
+                    for prev_node in &prevs {
+                        let i_p: usize = prev_node.index() + 1; // index of previous node
+                        max_cell = max(
+                            max_cell,
+                            max(
+                                TracebackCell {
+                                    score: traceback.get(i_p, j - 1).score
+                                        + self.scoring.match_fn.score(r, *query_base),
+                                    op: AlignmentOperation::Match(Some((i_p - 1, i - 1,r_char))),
+                                },
+                                TracebackCell {
+                                    score: traceback.get(i_p, j).score + self.scoring.gap_open,
+                                    op: AlignmentOperation::Del(Some((i_p - 1, i, r_char))),
+                                },
+                            ),
+                        );
+                    }
+                    max_cell
+                };
+
+                let score = max(
+                    max_cell,
+                    TracebackCell {
+                        score: traceback.get(i, j - 1).score + self.scoring.gap_open,
+                        op: AlignmentOperation::Ins(Some((i - 1,r_char))),
+                    },
+                );
+                if score.score > max_score_for_row {
+                    max_scoring_j = j;
+                    max_score_for_row = score.score;
+                }
+                traceback.set(i, j, score);
+            }
+        }
+
+        traceback
+    }
 	pub fn add_alignment(&mut self, aln: &Alignment, seq: TextSlice) {
         let head = Topo::new(&self.graph).next(&self.graph).unwrap();
         let mut prev: NodeIndex<usize> = NodeIndex::new(head.index());
@@ -580,6 +685,15 @@ impl<F: MatchFunc> Aligner<F> {
 		let index: Vec<NodeIndex<usize>> = self.poa.add_alignment_get_index(&alignment, &self.query);
 		index
 	}
+    /// Globally align a given query against the graph with a band around the previous
+    /// optimal score for speed.
+    pub fn global_banded(&mut self, query: TextSlice, bandwidth: usize) -> &mut Self {
+        self.query = query.to_vec();
+        self.traceback = self.poa.global_banded(query, bandwidth);
+        self
+    }
+
+
 	pub fn global(&mut self, query: TextSlice) -> &mut Self {
         // Store the current clip penalties
         let clip_penalties = [

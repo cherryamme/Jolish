@@ -13,7 +13,7 @@ pub mod bam;
 
 
 fn main() {
-    std::env::set_var("RUST_LOG", "info");
+    std::env::set_var("RUST_LOG", "debug");
     pretty_env_logger::init();
     let comands: Vec<String> = std::env::args().collect();
     let mut args = args::Args::parse();
