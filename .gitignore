@@ -24,8 +24,10 @@ Cargo.lock
 
 /target
 /benchmark
+benches
 /CYP21A2_Cyc
 test*
 **/*.fq.gz
 example
 benchmark2
+version_V0.0.1
